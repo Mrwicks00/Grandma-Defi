@@ -2,6 +2,8 @@
 
 > **"If your grandma can do it, anyone can do it!"** 🎯
 
+![grandma's-defi img](grandma.png)
+
 An AI-powered DeFi platform that makes decentralized finance accessible to everyone through natural language interaction and gasless smart wallets.
 
 ## 🚀 What It Does
