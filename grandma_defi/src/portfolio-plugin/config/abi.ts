@@ -1,0 +1,136 @@
+export const PORTFOLIO_MANAGER_ABI = [
+  {
+    inputs: [
+      { name: "_tokens", type: "address[]" },
+      { name: "_allocations", type: "uint256[]" },
+      { name: "_rebalanceThreshold", type: "uint256" },
+    ],
+    name: "createPortfolio",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "payable",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "_portfolioId", type: "uint256" }],
+    name: "getPortfolio",
+    outputs: [
+      { name: "owner", type: "address" },
+      { name: "tokens", type: "address[]" },
+      { name: "targetAllocations", type: "uint256[]" },
+      { name: "currentBalances", type: "uint256[]" },
+      { name: "totalValueUSD", type: "uint256" },
+      { name: "active", type: "bool" },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "_user", type: "address" }],
+    name: "getUserPortfolios",
+    outputs: [{ name: "", type: "uint256[]" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "_portfolioId", type: "uint256" }],
+    name: "rebalanceNow",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "getReadyActions",
+    outputs: [{ name: "readyActionIds", type: "uint256[]" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "executeReadyActions",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "_portfolioId", type: "uint256" }],
+    name: "updateAllPeaks",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      { name: "_token", type: "address" },
+      { name: "_tokenAmount", type: "uint256" },
+    ],
+    name: "addLiquidity",
+    outputs: [],
+    stateMutability: "payable",
+    type: "function",
+  },
+  {
+    inputs: [
+      { name: "_portfolioId", type: "uint256" },
+      { name: "_actionType", type: "uint8" },
+      { name: "_executeTime", type: "uint256" },
+      { name: "_tokens", type: "address[]" },
+      { name: "_allocations", type: "uint256[]" },
+      { name: "_conditionToken", type: "address" },
+      { name: "_priceCondition", type: "int256" },
+      { name: "_percentageCondition", type: "int256" },
+      { name: "_description", type: "string" },
+    ],
+    name: "scheduleAction",
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "_token", type: "address" }],
+    name: "getTokenPrice",
+    outputs: [{ name: "", type: "int256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      { name: "_portfolioId", type: "uint256" },
+      { name: "_token", type: "address" },
+    ],
+    name: "getTokenTracking",
+    outputs: [
+      { name: "entryPrice", type: "uint256" },
+      { name: "peakPrice", type: "uint256" },
+      { name: "peakTimestamp", type: "uint256" },
+      { name: "lastUpdateTime", type: "uint256" },
+      { name: "changeFromEntry", type: "int256" },
+      { name: "dropFromPeak", type: "int256" },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "_portfolioId", type: "uint256" }],
+    name: "calculatePortfolioChange",
+    outputs: [{ name: "", type: "int256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "_actionId", type: "uint256" }],
+    name: "executeActionManually",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+] as const;
+
+
+
+
+
+
+
+
+
