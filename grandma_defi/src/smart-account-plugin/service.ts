@@ -69,6 +69,7 @@ export class PimlicoWalletService extends Service {
 
     this.wallets.set(walletId, wallet);
     logger.info(`Added new wallet: ${wallet.name} (${walletId})`);
+
     return wallet;
   }
 
@@ -472,5 +473,63 @@ export class PimlicoWalletService extends Service {
         error: error instanceof Error ? error.message : "Unknown error",
       };
     }
+  }
+
+  // EOA wallet management methods - uses unified wallet numbering
+  async addEOAWallet(walletData: {
+    privateKey: string;
+    address: string;
+    type: string;
+    chainName: string;
+    chainId: number;
+    isImported: boolean;
+    isEOA: boolean;
+    createdAt: string;
+  }) {
+    try {
+      logger.info("Adding EOA wallet to service");
+
+      // Use the same unified wallet numbering system
+      const walletId = this.generateWalletId();
+      const wallet: StoredWallet = {
+        id: walletId,
+        name: `Wallet ${this.walletCounter}`, // Same naming as smart accounts
+        type: "eoa",
+        privateKey: walletData.privateKey,
+        eoaAddress: walletData.address,
+        chainId: walletData.chainId.toString(),
+        chainName: walletData.chainName,
+        isDeployed: true, // EOA is always "deployed"
+        createdAt: new Date(walletData.createdAt),
+        isImported: walletData.isImported,
+      };
+
+      this.wallets.set(walletId, wallet);
+      logger.info(
+        `EOA wallet stored with ID: ${walletId} (Wallet ${this.walletCounter})`
+      );
+
+      return {
+        success: true,
+        data: {
+          walletId,
+          address: walletData.address,
+          type: "eoa",
+          walletNumber: this.walletCounter,
+        },
+      };
+    } catch (error) {
+      logger.error("Error adding EOA wallet:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  }
+
+  // Remove separate EOA wallet lookup - now everything uses getWalletById with unified numbering
+  async getEOAWalletById(walletId: string) {
+    // Redirect to unified getWalletById method
+    return this.getWalletById(walletId);
   }
 }

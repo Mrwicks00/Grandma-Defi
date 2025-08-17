@@ -16,4 +16,4 @@ export const MANTLE_SEPOLIA_CONFIG: PimlicoConfig = {
   bundlerUrl: `https://api.pimlico.io/v2/${mantleSepoliaTestnet.id}/rpc?apikey=${process.env.PIMLICO_API_KEY}`,
   paymasterUrl: `https://api.pimlico.io/v2/${mantleSepoliaTestnet.id}/rpc?apikey=${process.env.PIMLICO_API_KEY}`,
   entryPointAddress: entryPoint07Address, // Using entry point v0.7
-};
+}; 

@@ -13,7 +13,7 @@ import portfolioPlugin from "./portfolio-plugin/plugin"; // <-- New portfolio pl
 export const character: Character = {
   name: "Eliza",
   plugins: [
-    "@elizaos/plugin-sql", 
+    "@elizaos/plugin-sql",
     "@elizaos/plugin-ollama",
     ...(process.env.ANTHROPIC_API_KEY ? ["@elizaos/plugin-anthropic"] : []),
     ...(process.env.OPENROUTER_API_KEY ? ["@elizaos/plugin-openrouter"] : []),
@@ -81,7 +81,7 @@ export const character: Character = {
         name: "{{name1}}",
         content: {
           text: "I already have a MetaMask wallet. Can I use it here?",
-        }, 
+        },
       },
       {
         name: "Eliza",
@@ -128,7 +128,7 @@ const initCharacter = ({ runtime }: { runtime: IAgentRuntime }) => {
 export const projectAgent: ProjectAgent = {
   character,
   init: async (runtime: IAgentRuntime) => await initCharacter({ runtime }),
-  plugins: [smartAccountPlugin, defillamaPlugin, portfolioPlugin], // <-- Portfolio plugin added here
+  plugins: [smartAccountPlugin, defillamaPlugin, portfolioPlugin], // <-- Back to original plugins
 };
 const project: Project = {
   agents: [projectAgent],

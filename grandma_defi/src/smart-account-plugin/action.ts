@@ -11,6 +11,8 @@ import {
 } from "@elizaos/core";
 import { PimlicoWalletService } from "./service";
 import { getTokenBalanceAction } from "./getTokenBalanceAction";
+import { importEOAAction } from "./importEOAAction";
+import { sendEOATransactionAction, checkEOABalanceAction } from "./eoaActions";
 
 // Define types for message data
 interface WalletData {
@@ -115,14 +117,14 @@ export const createWalletAction: Action = {
       const responseContent: Content = {
         text:
           `✅ Your new smart wallet has been created!\n\n` +
-          `📍 **Smart Contract Address:** ${walletData?.smartAddress}\n` +
+          `📍 **Smart Wallet Address:** ${walletData?.smartAddress}\n` +
           `🔑 **EOA Address:** ${walletData?.eoaAddress}\n` +
           `🔐 **Private Key:** ${walletData?.privateKey}\n` +
           `🌐 **Network:** ${walletData?.chainName}\n` +
           `🔗 **Chain ID:** ${walletData?.chainId}\n\n` +
           `${walletData?.isNewWallet ? "🆕 **New wallet created**\n\n" : "♻️ **Existing wallet loaded**\n\n"}` +
           `💡 **For MetaMask Import:** Use the private key above to import your EOA\n` +
-          `📝 **Note:** The smart contract wallet will be deployed on first transaction\n\n` +
+          `📝 **Note:** The smart wallet will be deployed on first transaction\n\n` +
           `🚀 **Ready for gasless transactions!** This wallet is powered by Pimlico on Mantle Sepolia.\n\n` +
           `💡 **What's next?**\n` +
           `• "Check balance" - See your wallet balance\n` +
@@ -527,12 +529,12 @@ export const getWalletInfoAction: Action = {
   ],
 };
 
-export const getBalanceAction: Action = { 
+export const getBalanceAction: Action = {
   name: "GET_WALLET_BALANCE",
   similes: [
     "CHECK_BALANCE",
     "VIEW_BALANCE",
-    "WALLET_BALANCE",   
+    "WALLET_BALANCE",
     "SHOW_BALANCE",
     "MY_BALANCE",
   ],
@@ -1174,7 +1176,7 @@ export const getWalletCountAction: Action = {
 
             return (
               `**${wallet.name}** ${walletType}${importStatus}\n` +
-              `📍 Smart Address: ${wallet.smartAddress || "N/A"}\n` +
+              `📍 Smart Wallet Address: ${wallet.smartAddress || "N/A"}\n` +
               `🔑 EOA Address: ${wallet.eoaAddress}\n` +
               `🌐 Network: ${wallet.chainName}\n` +
               `🚀 Status: ${deploymentStatus}\n` +
@@ -1252,12 +1254,14 @@ export const getWalletCountAction: Action = {
       {
         name: "{{name2}}",
         content: {
-          text: '📊 **Your Smart Account Wallets**\n\n🎯 **Total Wallets:** 3\n\n📋 **Wallet List:**\n**Wallet 1:**\n📍 Smart Address: 0x1fE07b450E0582844Ac8029Ab828ccb68648680C\n🔑 EOA Address: 0x1fE07b450E0582844Ac8029Ab828ccb68648680C\n\n**Wallet 2:**\n📍 Smart Address: 0x53e2Ac5Ed072d4A5DeC72889bfB3B5E8504a2300\n🔑 EOA Address: 0x53e2Ac5Ed072d4A5DeC72889bfB3B5E8504a2300\n\n**Wallet 3:**\n📍 Smart Address: 0x9f10E1d654d0a3bfDf2a99725b62634c9606b38c\n🔑 EOA Address: 0x9f10E1d654d0a3bfDf2a99725b62634c9606b38c\n\n💡 **Quick Actions:**\n• "Show wallet info for wallet 1"\n• "Check balance for wallet 2"\n• "Send 0.1 MNT from wallet 3 to 0x..."\n• "Create a new wallet"',
+          text: '📊 **Your Smart Account Wallets**\n\n🎯 **Total Wallets:** 3\n\n📋 **Wallet List:**\n**Wallet 1:**\n📍 Smart Wallet Address: 0x1fE07b450E0582844Ac8029Ab828ccb68648680C\n🔑 EOA Address: 0x1fE07b450E0582844Ac8029Ab828ccb68648680C\n\n**Wallet 2:**\n📍 Smart Wallet Address: 0x53e2Ac5Ed072d4A5DeC72889bfB3B5E8504a2300\n🔑 EOA Address: 0x53e2Ac5Ed072d4A5DeC72889bfB3B5E8504a2300\n\n**Wallet 3:**\n📍 Smart Wallet Address: 0x9f10E1d654d0a3bfDf2a99725b62634c9606b38c\n🔑 EOA Address: 0x9f10E1d654d0a3bfDf2a99725b62634c9606b38c\n\n💡 **Quick Actions:**\n• "Show wallet info for wallet 1"\n• "Check balance for wallet 2"\n• "Send 0.1 MNT from wallet 3 to 0x..."\n• "Create a new wallet"',
         },
       },
     ],
   ],
 };
 
-// Export the new token balance action
+// Export all actions
 export { getTokenBalanceAction };
+export { importEOAAction };
+export { sendEOATransactionAction, checkEOABalanceAction };

@@ -12,28 +12,38 @@ import {
 import { PortfolioService } from "../service";
 import { SUPPORTED_TOKENS } from "../config/addresses";
 
-// Helper function to get wallet private key by ID
+// Helper function to get wallet private key by ID (unified system for both smart accounts and EOA)
 async function getWalletPrivateKey(
   runtime: IAgentRuntime,
   walletId?: string
 ): Promise<string> {
   if (!walletId) {
     throw new Error(
-      "Please specify which wallet to use (e.g., 'from wallet 1')"
+      "Please specify which wallet to use (e.g., 'from wallet 1' or 'from wallet 2')"
     );
   }
 
   const smartAccountService = runtime.getService("pimlico_wallet") as any;
   if (!smartAccountService) {
-    throw new Error("Smart account service not available");
+    throw new Error("Wallet service not available");
   }
 
-  const walletResult = await smartAccountService.getWalletById(walletId);
-  if (!walletResult.success || !walletResult.data) {
-    throw new Error(`Wallet ${walletId} not found`);
+  // Use unified wallet lookup - now both smart accounts and EOAs use the same wallet-X format
+  try {
+    const walletResult = await smartAccountService.getWalletById(walletId);
+    if (walletResult.success && walletResult.data) {
+      return walletResult.data.privateKey;
+    }
+  } catch (error) {
+    // Wallet not found
   }
 
-  return walletResult.data.privateKey;
+  throw new Error(
+    `Wallet ${walletId} not found. Available options:\n` +
+      `• Create smart account: "create wallet"\n` +
+      `• Import EOA: "import EOA wallet with private key 0x..."\n` +
+      `• List wallets: "show my wallets"`
+  );
 }
 
 // Helper function to parse token amounts from text

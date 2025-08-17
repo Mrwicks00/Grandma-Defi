@@ -5,18 +5,23 @@ import { logger, ModelType } from "@elizaos/core";
 import { z } from "zod";
 import {
   createWalletAction,
-  importWalletAction,
   getBalanceAction,
   sendTransactionAction,
   getWalletInfoAction,
   batchTransactionsAction,
   getWalletCountAction,
   getTokenBalanceAction,
+  importEOAAction,
+  sendEOATransactionAction,
+  checkEOABalanceAction,
 } from "./action";
 import { PimlicoWalletService } from "./service";
 
 const configSchema = z.object({
-  PIMLICO_API_KEY: z.string().min(1, "Pimlico API key is not provided"),
+  PIMLICO_API_KEY: z
+    .string()
+    .min(1, "Pimlico API key is not provided")
+    .optional(),
 });
 
 const plugin: Plugin = {
@@ -39,6 +44,12 @@ const plugin: Plugin = {
         }
       }
 
+      if (!config.PIMLICO_API_KEY && !process.env.PIMLICO_API_KEY) {
+        logger.warn(
+          "⚠️ PIMLICO_API_KEY not provided - wallet functionality will be limited"
+        );
+      }
+
       logger.info(
         " Pimlico/Para plugin initialized successfully on Mantle Sepolia Testnet "
       );
@@ -49,10 +60,6 @@ const plugin: Plugin = {
   },
 
   models: {
-    [ModelType.TEXT_SMALL]: async (): Promise<string> =>
-      "👵 A new wallet is made, sweetie!",
-    [ModelType.TEXT_LARGE]: async (): Promise<string> =>
-      "👵 A new Pimlico/Para ERC-4337 smart wallet has been created on the Mantle network, just for you!",
     [ModelType.TEXT_EMBEDDING]: async (params: any): Promise<number[]> => {
       // Return a dummy embedding vector for wallet-related content
       // In a real implementation, you might want to use an actual embedding service
@@ -87,15 +94,17 @@ const plugin: Plugin = {
   services: [PimlicoWalletService],
   actions: [
     createWalletAction,
-    importWalletAction,
     getBalanceAction,
     sendTransactionAction,
     getWalletInfoAction,
     batchTransactionsAction,
     getWalletCountAction,
     getTokenBalanceAction,
+    importEOAAction,
+    sendEOATransactionAction,
+    checkEOABalanceAction,
   ],
   providers: [],
 };
 
-export default plugin; 
+export default plugin;
