@@ -404,12 +404,18 @@ export class PortfolioService extends Service {
   }
 
   /**
-   * Get token price from the smart contract
+   * Get the current USD price of a token from Chainlink
    */
-  async getTokenPrice(privateKey: string, tokenAddress: string) {
+  async getTokenPrice(tokenAddress: string) {
     try {
-      const { publicClient } =
-        await createSmartAccountFromPrivateKey(privateKey);
+      // Create a public client - no private key needed for reading prices!
+      const { createPublicClient, http } = await import("viem");
+      const { mantleSepoliaTestnet } = await import("viem/chains");
+
+      const publicClient = createPublicClient({
+        chain: mantleSepoliaTestnet,
+        transport: http("https://rpc.sepolia.mantle.xyz"),
+      });
 
       const price = await publicClient.readContract({
         address: ADDRESSES.PortfolioManager as any,
@@ -418,11 +424,15 @@ export class PortfolioService extends Service {
         args: [tokenAddress as `0x${string}`],
       });
 
+      // Convert from 8 decimal price feed to USD
+      const priceUSD = Number(price) / 1e8;
+
       return {
         success: true,
         data: {
           tokenAddress,
-          price: price.toString(),
+          priceUSD,
+          rawPrice: price.toString(),
         },
       };
     } catch (error) {

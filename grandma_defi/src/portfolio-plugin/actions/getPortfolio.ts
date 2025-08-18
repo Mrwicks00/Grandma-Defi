@@ -40,9 +40,9 @@ async function getWalletPrivateKey(
 
   throw new Error(
     `Wallet ${walletId} not found. Available options:\n` +
-    `• Create smart account: "create wallet"\n` +
-    `• Import EOA: "import EOA wallet with private key 0x..."\n` +
-    `• List wallets: "show my wallets"`
+      `• Create smart account: "create wallet"\n` +
+      `• Import EOA: "import EOA wallet with private key 0x..."\n` +
+      `• List wallets: "show my wallets"`
   );
 }
 
@@ -172,29 +172,63 @@ export const getPortfolioAction: Action = {
         let portfolioDetails = "";
         let totalValueBreakdown = "";
         let totalCalculatedValue = 0;
-        
+
         // Token emoji mapping for visual appeal
         const tokenEmojis: { [key: string]: string } = {
-          "MNT": "🏛️",
-          "wETH": "💎", 
-          "wBTC": "🟡",
-          "USDT18": "💸",
+          MNT: "🏛️",
+          wETH: "💎",
+          wBTC: "🟡",
+          USDT18: "💸",
           "USDT (Legacy)": "💰",
-          "GRANDMA": "👵"
+          GRANDMA: "👵",
         };
 
         for (let i = 0; i < portfolio.tokens.length; i++) {
           const tokenAddress = portfolio.tokens[i];
           const tokenInfo = getTokenInfo(tokenAddress);
-          const targetAllocation = formatPercentage(portfolio.targetAllocations[i]);
-          const balance = formatTokenAmount(portfolio.currentBalances[i], tokenInfo.decimals);
+          const targetAllocation = formatPercentage(
+            portfolio.targetAllocations[i]
+          );
+          const balance = formatTokenAmount(
+            portfolio.currentBalances[i],
+            tokenInfo.decimals
+          );
           const emoji = tokenEmojis[tokenInfo.symbol] || "🔸";
-          
-          // Calculate individual token USD value (rough estimate for display)
-          const rawBalance = parseFloat(portfolio.currentBalances[i]) / Math.pow(10, tokenInfo.decimals);
-          const totalPortfolioUSD = parseFloat(portfolio.totalValueUSD);
-          const allocationPercent = parseInt(portfolio.targetAllocations[i]) / 10000;
-          const tokenUSDValue = totalPortfolioUSD * allocationPercent;
+
+          // Calculate individual token USD value based on actual token price
+          const rawBalance =
+            parseFloat(portfolio.currentBalances[i]) /
+            Math.pow(10, tokenInfo.decimals);
+
+          // Get actual token price from the service
+          let tokenUSDValue = 0;
+          try {
+            const priceResult = await service.getTokenPrice(tokenAddress);
+            console.log(`🔍 Price fetch for ${tokenInfo.symbol}:`, priceResult);
+            if (priceResult.success && priceResult.data) {
+              const tokenPrice = priceResult.data.priceUSD;
+              tokenUSDValue = rawBalance * tokenPrice;
+              console.log(
+                `✅ ${tokenInfo.symbol}: ${rawBalance} × $${tokenPrice} = $${tokenUSDValue.toFixed(2)}`
+              );
+            } else {
+              console.log(
+                `❌ Price fetch failed for ${tokenInfo.symbol}, using fallback`
+              );
+              // Fallback to proportional calculation if price fetch fails
+              const totalPortfolioUSD = parseFloat(portfolio.totalValueUSD);
+              const allocationPercent =
+                parseInt(portfolio.targetAllocations[i]) / 10000;
+              tokenUSDValue = totalPortfolioUSD * allocationPercent;
+            }
+          } catch (error) {
+            console.log(`💥 Price fetch error for ${tokenInfo.symbol}:`, error);
+            // Fallback to proportional calculation on error
+            const totalPortfolioUSD = parseFloat(portfolio.totalValueUSD);
+            const allocationPercent =
+              parseInt(portfolio.targetAllocations[i]) / 10000;
+            tokenUSDValue = totalPortfolioUSD * allocationPercent;
+          }
           totalCalculatedValue += tokenUSDValue;
 
           portfolioDetails += `${emoji} **${tokenInfo.symbol}**: ${balance} ${tokenInfo.symbol}\n`;
@@ -202,9 +236,11 @@ export const getPortfolioAction: Action = {
         }
 
         // Create beautiful status badges
-        const statusBadge = portfolio.active ? "🟢 **ACTIVE**" : "🔴 **INACTIVE**";
+        const statusBadge = portfolio.active
+          ? "🟢 **ACTIVE**"
+          : "🔴 **INACTIVE**";
         const valueFormatted = formatUSDValue(portfolio.totalValueUSD);
-        
+
         // Create progress bars for allocations (visual representation)
         let allocationBars = "";
         for (let i = 0; i < portfolio.tokens.length; i++) {
@@ -221,31 +257,25 @@ export const getPortfolioAction: Action = {
             `╭─────────────────────────────────────╮\n` +
             `│           📊 PORTFOLIO #${portfolio.portfolioId}            │\n` +
             `╰─────────────────────────────────────╯\n\n` +
-            
             `🔐 **Owner:** \`${portfolio.owner.slice(0, 6)}...${portfolio.owner.slice(-4)}\`\n` +
             `💰 **Total Value:** **$${valueFormatted} USD**\n` +
             `📈 **Status:** ${statusBadge}\n` +
             `🏦 **Smart Account:** \`${portfolio.smartAccountAddress.slice(0, 6)}...${portfolio.smartAccountAddress.slice(-4)}\`\n\n` +
-            
             `╭─── 🎯 **CURRENT HOLDINGS** ───╮\n` +
             `${portfolioDetails}` +
             `╰─────────────────────────────────╯\n\n` +
-            
             `╭─── 📊 **ALLOCATION BREAKDOWN** ───╮\n` +
             `${allocationBars}` +
             `╰─────────────────────────────────────╯\n\n` +
-            
             `✨ **Portfolio Features:**\n` +
             `• 🤖 AI-powered rebalancing\n` +
             `• ⚡ Gasless transactions\n` +
             `• 🔄 Automatic market monitoring\n` +
             `• 📈 Real-time price tracking\n\n` +
-            
             `💡 **Quick Actions:**\n` +
             `• \`rebalance portfolio ${portfolio.portfolioId}\` - Manual rebalance\n` +
             `• \`portfolio ${portfolio.portfolioId} details\` - Refresh data\n` +
             `• \`swap tokens portfolio ${portfolio.portfolioId}\` - Token swap\n\n` +
-            
             `🌟 *Your AI portfolio manager is working 24/7 to optimize your investments!*`,
           source: message.content?.source || "user",
           data: portfolio,
@@ -298,7 +328,7 @@ export const getPortfolioAction: Action = {
         let portfolioList = "";
         let totalValue = 0;
         let activeCount = 0;
-        
+
         for (let i = 0; i < userPortfolios.portfolioIds.length; i++) {
           const portfolioId = userPortfolios.portfolioIds[i];
           try {
@@ -308,15 +338,17 @@ export const getPortfolioAction: Action = {
             );
             if (portfolioResult.success) {
               const portfolio = portfolioResult.data!;
-              const status = portfolio.active ? "🟢 **ACTIVE**" : "🔴 **INACTIVE**";
+              const status = portfolio.active
+                ? "🟢 **ACTIVE**"
+                : "🔴 **INACTIVE**";
               const value = parseFloat(portfolio.totalValueUSD);
               totalValue += value;
               if (portfolio.active) activeCount++;
-              
+
               // Get token count for quick overview
               const tokenCount = portfolio.tokens.length;
               const valueFormatted = formatUSDValue(portfolio.totalValueUSD);
-              
+
               portfolioList += `╭─── 📊 **PORTFOLIO #${portfolio.portfolioId}** ───╮\n`;
               portfolioList += `│ 💰 Value: **$${valueFormatted} USD**\n`;
               portfolioList += `│ 📈 Status: ${status}\n`;
@@ -330,34 +362,30 @@ export const getPortfolioAction: Action = {
         }
 
         const totalFormatted = formatUSDValue(totalValue.toString());
-        const walletWorth = totalValue > 0 ? ` (Total Worth: **$${totalFormatted}**)` : "";
+        const walletWorth =
+          totalValue > 0 ? ` (Total Worth: **$${totalFormatted}**)` : "";
 
         const responseContent: Content = {
           text:
             `╭───────────────────────────────────────╮\n` +
             `│           🏦 YOUR PORTFOLIO HUB       │\n` +
             `╰───────────────────────────────────────╯\n\n` +
-            
             `🔐 **Wallet Address:** \`${userPortfolios.userAddress.slice(0, 6)}...${userPortfolios.userAddress.slice(-4)}\`\n` +
             `📊 **Total Portfolios:** ${userPortfolios.portfolioIds.length} ${walletWorth}\n` +
             `🟢 **Active Portfolios:** ${activeCount}/${userPortfolios.portfolioIds.length}\n` +
             `🆔 **Portfolio IDs:** ${userPortfolios.portfolioIds.join(", ")}\n\n` +
-            
             `╭─── 📋 **PORTFOLIO OVERVIEW** ───╮\n` +
             `${portfolioList}` +
             `╰─────────────────────────────────╯\n\n` +
-            
             `🚀 **Quick Actions:**\n` +
             `• \`get portfolio [ID] from wallet ${walletId?.split("-")[1]}\` - View details\n` +
             `• \`create portfolio with [amount] MNT\` - New portfolio\n` +
             `• \`rebalance portfolio [ID]\` - Manual rebalance\n\n` +
-            
             `✨ **Portfolio Stats:**\n` +
-            `• 🤖 AI manages ${activeCount} active portfolio${activeCount !== 1 ? 's' : ''}\n` +
+            `• 🤖 AI manages ${activeCount} active portfolio${activeCount !== 1 ? "s" : ""}\n` +
             `• ⚡ All transactions are gasless\n` +
             `• 📈 Real-time market monitoring active\n` +
             `• 🔄 Auto-rebalancing when needed\n\n` +
-            
             `🌟 *Your AI-powered DeFi portfolio management system is operational!*`,
           source: message.content?.source || "user",
           data: userPortfolios,

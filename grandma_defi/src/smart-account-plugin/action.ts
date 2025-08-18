@@ -27,7 +27,16 @@ interface WalletData {
 // Fixed handler signature - removed arrow function syntax
 export const createWalletAction: Action = {
   name: "CREATE_WALLET",
-  similes: ["CREATE_WALLET", "NEW_WALLET", "MAKE_WALLET", "GENERATE_WALLET"],
+  similes: [
+    "CREATE_WALLET",
+    "NEW_WALLET",
+    "MAKE_WALLET",
+    "GENERATE_WALLET",
+    "CREATE_SMART_WALLET",
+    "NEW_SMART_WALLET",
+    "SMART_ACCOUNT",
+    "CREATE_SMART_ACCOUNT",
+  ],
   description: "Creates a new ERC-4337 smart wallet for a beginner",
   validate: async (
     runtime: IAgentRuntime,
@@ -46,6 +55,10 @@ export const createWalletAction: Action = {
       "wallet creation",
       "create smart wallet",
       "new smart wallet",
+      "create smart account",
+      "new smart account",
+      "smart account",
+      "create a new wallet",
     ];
 
     // Only validate if the message actually contains wallet creation intent
@@ -536,6 +549,9 @@ export const getBalanceAction: Action = {
     "VIEW_BALANCE",
     "WALLET_BALANCE",
     "SHOW_BALANCE",
+    "GET_BALANCE",
+    "EVM_BALANCE",
+    "BALANCE",
     "MY_BALANCE",
   ],
   description: "Check the balance of a Pimlico smart wallet",
@@ -570,25 +586,27 @@ export const getBalanceAction: Action = {
       const messageData = message.content?.data as WalletData;
       let address: string | undefined = messageData?.address;
 
-      // Try to extract address from text
+      // Try to extract address from text - prioritize wallet number over raw address
       if (!address) {
         const text = message.content?.text || "";
-        const addressMatch = text.match(/0x[a-fA-F0-9]{40}/i);
-        if (addressMatch) {
-          address = addressMatch[0];
-        } else {
-          // Check for wallet number references
-          const walletNumberMatch = text.match(/wallet\s*(\d+)/i);
-          if (walletNumberMatch) {
-            const walletNumber = parseInt(walletNumberMatch[1], 10);
-            const walletId = `wallet-${walletNumber}`;
 
-            // Try to get wallet by ID
-            const walletResult = await service.getWalletById(walletId);
-            if (walletResult.success && walletResult.data) {
-              address =
-                walletResult.data.smartAddress || walletResult.data.eoaAddress;
-            }
+        // First check for wallet number references (this should be prioritized)
+        const walletNumberMatch = text.match(/wallet\s*(\d+)/i);
+        if (walletNumberMatch) {
+          const walletNumber = parseInt(walletNumberMatch[1], 10);
+          const walletId = `wallet-${walletNumber}`;
+
+          // Try to get wallet by ID
+          const walletResult = await service.getWalletById(walletId);
+          if (walletResult.success && walletResult.data) {
+            address =
+              walletResult.data.smartAddress || walletResult.data.eoaAddress;
+          }
+        } else {
+          // Only if no wallet number is found, try to extract raw address
+          const addressMatch = text.match(/0x[a-fA-F0-9]{40}/i);
+          if (addressMatch) {
+            address = addressMatch[0];
           }
         }
       }
@@ -689,6 +707,9 @@ export const sendTransactionAction: Action = {
     "PAY",
     "SEND_MNT",
     "TRANSFER_FUNDS",
+    "SEND_TRANSACTION",
+    "EVM_SEND_TOKENS",
+    "SEND_TOKENS",
   ],
   description: "Send a gasless transaction from the smart wallet",
   validate: async (
@@ -698,8 +719,13 @@ export const sendTransactionAction: Action = {
     const messageData = message.content?.data as WalletData;
     if (!messageData) {
       const text = message.content?.text?.toLowerCase() || "";
+      // Only validate if this is specifically a transaction, not portfolio creation
       return (
-        text.includes("send") && (text.includes("to") || text.includes("0x"))
+        text.includes("send") &&
+        (text.includes("to") || text.includes("0x")) &&
+        !text.includes("portfolio") &&
+        !text.includes("create") &&
+        !text.includes("balanced")
       );
     }
 
@@ -791,33 +817,99 @@ export const sendTransactionAction: Action = {
         `Attempting to send ${amount} MNT to ${to} using private key ${privateKey.substring(0, 10)}...`
       );
 
-      const result = await service.sendTransaction(privateKey, to, amount);
-      if (!result.success) {
-        throw new Error(result.error || "Transaction failed");
-      }
+      // Get the wallet number match again for wallet type determination
+      const walletMatchForType = (message.content?.text || "").match(
+        /(?:from\s+)?wallet\s*(\d+)/i
+      );
+      const walletId = walletMatchForType
+        ? `wallet-${walletMatchForType[1]}`
+        : "wallet-1";
+      const walletResult = await service.getWalletById(walletId);
 
-      const txData = result.data;
-      if (!txData) {
-        throw new Error("No transaction data received");
-      }
+      let responseContent: Content;
 
-      const responseContent: Content = {
-        text:
-          `✅ **Transaction sent successfully!**\n\n` +
-          `💸 **Amount:** ${amount} MNT\n` +
-          `📍 **To:** ${to}\n` +
-          `🧾 **Transaction Hash:** ${txData.transactionHash}\n` +
-          `🔗 **Explorer:** https://sepolia.mantlescan.xyz/tx/${txData.transactionHash}\n\n` +
-          `🎉 **Completely gasless** - no fees charged!\n\n` +
-          `The recipient will receive the funds once confirmed on the blockchain.`,
-        source: message.content?.source || "user",
-        data: {
-          transactionHash: txData.transactionHash,
+      if (walletResult.success && walletResult.data?.type === "eoa") {
+        // Send via EOA with gas fees using ethers
+        const { ethers } = await import("ethers");
+        const provider = new ethers.JsonRpcProvider(
+          "https://rpc.sepolia.mantle.xyz"
+        );
+        const wallet = new ethers.Wallet(privateKey, provider);
+
+        // Check balance
+        const balance = await provider.getBalance(wallet.address);
+        const balanceEth = ethers.formatEther(balance);
+
+        if (parseFloat(balanceEth) < parseFloat(amount)) {
+          throw new Error(
+            `Insufficient balance. You have ${parseFloat(balanceEth).toFixed(4)} MNT`
+          );
+        }
+
+        // Send transaction
+        const tx = await wallet.sendTransaction({
           to,
-          amount,
-          explorerUrl: txData.explorerUrl,
-        },
-      };
+          value: ethers.parseEther(amount),
+        });
+
+        const receipt = await tx.wait();
+
+        responseContent = {
+          text:
+            `✅ **EOA Transaction completed successfully!**\n\n` +
+            `💸 **Amount:** ${amount} MNT\n` +
+            `📍 **To:** ${to}\n` +
+            `📍 **From:** ${wallet.address}\n` +
+            `⛽ **Gas Used:** ${receipt?.gasUsed.toString()}\n` +
+            `🧾 **Transaction Hash:** ${tx.hash}\n` +
+            `🔗 **Explorer:** https://sepolia.mantlescan.xyz/tx/${tx.hash}\n\n` +
+            `🎉 **Transaction complete!** The recipient will receive the funds once confirmed.\n\n` +
+            `💡 **This was a regular transaction (like MetaMask):**\n` +
+            `• ✅ You paid gas fees directly\n` +
+            `• ✅ Transaction is immediately on-chain\n` +
+            `• ✅ Works with all DeFi protocols`,
+          source: message.content?.source || "user",
+          data: {
+            transactionHash: tx.hash,
+            to,
+            amount,
+            from: wallet.address,
+            gasUsed: receipt?.gasUsed.toString(),
+            explorerUrl: `https://sepolia.mantlescan.xyz/tx/${tx.hash}`,
+            type: "eoa_transaction",
+          },
+        };
+      } else {
+        // Send via smart account (gasless)
+        const result = await service.sendTransaction(privateKey, to, amount);
+        if (!result.success) {
+          throw new Error(result.error || "Transaction failed");
+        }
+
+        const txData = result.data;
+        if (!txData) {
+          throw new Error("No transaction data received");
+        }
+
+        responseContent = {
+          text:
+            `✅ **Smart Account Transaction sent successfully!**\n\n` +
+            `💸 **Amount:** ${amount} MNT\n` +
+            `📍 **To:** ${to}\n` +
+            `🧾 **Transaction Hash:** ${txData.transactionHash}\n` +
+            `🔗 **Explorer:** https://sepolia.mantlescan.xyz/tx/${txData.transactionHash}\n\n` +
+            `🎉 **Completely gasless** - no fees charged!\n\n` +
+            `The recipient will receive the funds once confirmed on the blockchain.`,
+          source: message.content?.source || "user",
+          data: {
+            transactionHash: txData.transactionHash,
+            to,
+            amount,
+            explorerUrl: txData.explorerUrl,
+            type: "smart_account_transaction",
+          },
+        };
+      }
 
       if (callback) {
         await callback(responseContent);
