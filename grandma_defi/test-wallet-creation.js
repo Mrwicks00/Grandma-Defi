@@ -80,20 +80,3 @@ async function testWalletCreation() {
 }
 
 testWalletCreation().catch(console.error);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

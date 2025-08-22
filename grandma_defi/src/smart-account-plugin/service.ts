@@ -8,6 +8,15 @@ import {
   sendTransactionWithData,
   getAccountBalance,
 } from "./provider";
+import { OrbyProvider } from "@orb-labs/orby-ethers6";
+import {
+  Account,
+  AccountCluster,
+  Activity,
+  ActivityStatus,
+  OnchainOperation,
+} from "@orb-labs/orby-core";
+import { ethers, TypedDataDomain, TypedDataField } from "ethers";
 
 // Define wallet types
 interface StoredWallet {
@@ -39,7 +48,7 @@ export class PimlicoWalletService extends Service {
     super(runtime);
     // Start with clean slate - no hardcoded wallets
     logger.info(
-      "🚀 Wallet service initialized - ready to create or import wallets"
+      "🚀 Wallet service initialized - ready to create or import wallets" 
     );
   }
 
@@ -531,5 +540,44 @@ export class PimlicoWalletService extends Service {
   async getEOAWalletById(walletId: string) {
     // Redirect to unified getWalletById method
     return this.getWalletById(walletId);
+  }
+
+  async orbySetup(
+    orbyInstancePrivateUrl: string,
+    chainId: bigint,
+    address: string
+  ): Promise<{
+    virtualNodeProvider: OrbyProvider;
+    accountCluster: AccountCluster;
+  }> {
+    // 1. Connect to the private instance
+    const privateInstanceProvider = new OrbyProvider(orbyInstancePrivateUrl);
+
+    // 2. Create account cluster
+    const accounts = [
+      Account.toAccount({ vmType: "EVM", address, accountType: "EOA" }),
+    ];
+    const accountCluster =
+      await privateInstanceProvider.createAccountCluster(accounts);
+    if (!accountCluster) {
+      throw new Error("failed to create account cluster");
+    }
+
+    // 3. Get virtual node RPC URL
+    const virtualNodeRpcUrl =
+      await privateInstanceProvider.getVirtualNodeRpcUrl(
+        accountCluster.accountClusterId,
+        chainId,
+        address
+      );
+
+    if (!virtualNodeRpcUrl) {
+      throw new Error("failed to get virtual node RPC URL");
+    }
+
+    // 4. Create virtual node client
+    const virtualNodeProvider = new OrbyProvider(virtualNodeRpcUrl);
+
+    return { virtualNodeProvider, accountCluster };
   }
 }

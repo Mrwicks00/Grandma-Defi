@@ -14,6 +14,8 @@ import {
   importEOAAction,
   sendEOATransactionAction,
   checkEOABalanceAction,
+  showHoldingsAction,
+  holdingsValueAction,
 } from "./action";
 import { PimlicoWalletService } from "./service";
 
@@ -103,6 +105,8 @@ const plugin: Plugin = {
     importEOAAction,
     sendEOATransactionAction,
     checkEOABalanceAction,
+    showHoldingsAction,
+    holdingsValueAction,
   ],
   providers: [],
 };

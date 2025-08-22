@@ -27,7 +27,7 @@
       "@elizaos/core/*": ["../../core/src/*"]
     }
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "debug-orby-portfolio.ts"],
   "exclude": [
     "dist",
     "node_modules",

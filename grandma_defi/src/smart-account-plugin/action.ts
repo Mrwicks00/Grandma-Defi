@@ -13,6 +13,7 @@ import { PimlicoWalletService } from "./service";
 import { getTokenBalanceAction } from "./getTokenBalanceAction";
 import { importEOAAction } from "./importEOAAction";
 import { sendEOATransactionAction, checkEOABalanceAction } from "./eoaActions";
+import { showHoldingsAction, holdingsValueAction } from "./holdingsActions";
 
 // Define types for message data
 interface WalletData {
@@ -1357,3 +1358,4 @@ export const getWalletCountAction: Action = {
 export { getTokenBalanceAction };
 export { importEOAAction };
 export { sendEOATransactionAction, checkEOABalanceAction };
+export { showHoldingsAction, holdingsValueAction };

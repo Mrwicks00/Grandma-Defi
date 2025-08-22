@@ -9,8 +9,15 @@ import {
   createActionResult,
   logger,
 } from "@elizaos/core";
-import { ethers } from "ethers";
+import { ethers, TypedDataDomain, TypedDataField } from "ethers";
 import { PimlicoWalletService } from "./service";
+import { OrbyProvider } from "@orb-labs/orby-ethers6";
+import {
+  Activity,
+  ActivityStatus,
+  OnchainOperation,
+  OperationType,
+} from "@orb-labs/orby-core";
 
 interface EOATransactionData {
   privateKey?: string;
@@ -114,82 +121,180 @@ export const sendEOATransactionAction: Action = {
         throw new Error("Invalid amount");
       }
 
-      // Create ethers provider and wallet
-      const provider = new ethers.JsonRpcProvider(
-        "https://rpc.sepolia.mantle.xyz"
+      const wallet = new ethers.Wallet(privateKey);
+      const { virtualNodeProvider, accountCluster } = await service.orbySetup(
+        process.env.ORBY_PRIVATE_INSTANCE_URL!,
+        BigInt(5003),
+        wallet.address
       );
-      const wallet = new ethers.Wallet(privateKey, provider);
 
-      // Check balance
-      const balance = await provider.getBalance(wallet.address);
-      const balanceEth = ethers.formatEther(balance);
+      const portfolio = await virtualNodeProvider.getFungibleTokenPortfolio(
+        accountCluster.accountClusterId
+      );
 
-      if (parseFloat(balanceEth) < numAmount) {
-        throw new Error(
-          `Insufficient balance. You have ${parseFloat(balanceEth).toFixed(4)} MNT but trying to send ${amount} MNT`
-        );
+      if (!portfolio) {
+        throw new Error("failed to get fungible token portfolio");
       }
 
-      // Estimate gas
-      const gasLimit = await provider.estimateGas({
-        to,
-        value: ethers.parseEther(amount),
-        from: wallet.address,
-      });
+      // find token where balance is more than 50c
+      const firstNotableBalance = portfolio.find(
+        (balance) => balance.total.fiatValue().toRawAmount() >= 500000
+      );
 
-      const feeData = await provider.getFeeData();
-      const gasPrice = feeData.gasPrice || ethers.parseUnits("20", "gwei");
-      const gasCost = gasLimit * gasPrice;
-      const gasCostEth = ethers.formatEther(gasCost);
+      const response =
+        await virtualNodeProvider.getOperationsToExecuteTransaction(
+          accountCluster.accountClusterId, // accountClusterId
+          "0x", // data
+          to, // to
+          ethers.parseEther(amount), // value
+          firstNotableBalance
+            ? { standardizedTokenId: firstNotableBalance.standardizedTokenId }
+            : undefined
+        );
 
-      // Send transaction
-      const tx = await wallet.sendTransaction({
-        to,
-        value: ethers.parseEther(amount),
-        gasLimit,
-        gasPrice,
-      });
+      // callback to sign transactions
+      const signTransaction = async (
+        operation: OnchainOperation
+      ): Promise<string | undefined> => {
+        const virtualNodeProvider = new OrbyProvider(operation.txRpcUrl);
+        const wallet = new ethers.Wallet(privateKey, virtualNodeProvider);
 
-      logger.info(`EOA transaction sent: ${tx.hash}`);
-
-      // Wait for confirmation
-      const receipt = await tx.wait();
-
-      const responseContent: Content = {
-        text:
-          `✅ **EOA Transaction completed successfully!**\n\n` +
-          `💸 **Amount:** ${amount} MNT\n` +
-          `📍 **To:** ${to}\n` +
-          `📍 **From:** ${wallet.address}\n` +
-          `⛽ **Gas Used:** ${receipt?.gasUsed.toString()}\n` +
-          `💰 **Gas Cost:** ~${parseFloat(gasCostEth).toFixed(6)} MNT\n` +
-          `🧾 **Transaction Hash:** ${tx.hash}\n` +
-          `🔗 **Explorer:** https://sepolia.mantlescan.xyz/tx/${tx.hash}\n\n` +
-          `💡 **This was a regular transaction (like MetaMask):**\n` +
-          `• ✅ You paid gas fees directly\n` +
-          `• ✅ Transaction is immediately on-chain\n` +
-          `• ✅ Works with all DeFi protocols\n\n` +
-          `🎉 Recipient will receive ${amount} MNT once confirmed!`,
-        source: message.content?.source || "user",
-        data: {
-          transactionHash: tx.hash,
+        const {
+          from,
           to,
-          amount,
-          from: wallet.address,
-          gasUsed: receipt?.gasUsed.toString(),
-          gasCost: gasCostEth,
-          explorerUrl: `https://sepolia.mantlescan.xyz/tx/${tx.hash}`,
-          type: "eoa_transaction",
-        },
+          data,
+          gasPrice,
+          maxPriorityFeePerGas,
+          maxFeePerGas,
+          gasLimit,
+          value,
+          nonce,
+          chainId,
+        } = operation;
+
+        const txData = {
+          from,
+          to,
+          value,
+          data,
+          nonce: Number(nonce),
+          gasLimit,
+          chainId,
+          gasPrice,
+          maxFeePerGas,
+          maxPriorityFeePerGas,
+        };
+
+        return await wallet.signTransaction(txData);
       };
 
-      if (callback) {
-        await callback(responseContent);
+      // callback to sign typeddata
+      const signTypedData = async (
+        operation: OnchainOperation
+      ): Promise<string | undefined> => {
+        const virtualNodeProvider = new OrbyProvider(operation.txRpcUrl);
+        const wallet = new ethers.Wallet(privateKey, virtualNodeProvider);
+
+        const parsedData = JSON.parse(operation.data) as {
+          domain: TypedDataDomain;
+          types: Record<string, Array<TypedDataField>>;
+          message: Record<string, any>;
+        };
+        delete parsedData.types["EIP712Domain"];
+
+        return await wallet.signTypedData(
+          parsedData.domain,
+          parsedData.types,
+          parsedData.message
+        );
+      };
+
+      // callback for operations
+      const onOperationSetStatusUpdateCallback = async (
+        activity?: Activity
+      ): Promise<void> => {
+        if (!activity) {
+          // TODO(Adeoba): handle this case
+        } else if (
+          [ActivityStatus.SUCCESSFUL, ActivityStatus.PENDING].includes(
+            activity?.overallStatus
+          )
+        ) {
+          const finalOperation = activity.operationStatuses.find(
+            (status) => status.type == OperationType.FINAL_TRANSACTION
+          );
+
+          if (!finalOperation) {
+            // TODO(Adeoba): handle this case
+          }
+
+          const receipt = await virtualNodeProvider.getTransactionReceipt(
+            finalOperation?.hash!
+          );
+
+          const responseContent: Content = {
+            text:
+              `✅ **EOA Transaction completed successfully!**\n\n` +
+              `💸 **Amount:** ${amount} MNT\n` +
+              `📍 **To:** ${to}\n` +
+              `📍 **From:** ${wallet.address}\n` +
+              `⛽ **Gas Used:** ${receipt?.gasUsed.toString()}\n` +
+              `💰 **Gas Cost:** ~${activity?.gasTokenAmount?.toSignificant(6)} MNT\n` +
+              `🧾 **Transaction Hash:** ${finalOperation?.hash}\n` +
+              `🔗 **Explorer:** https://sepolia.mantlescan.xyz/tx/${finalOperation?.hash}\n\n` +
+              `💡 **This was a regular transaction (like MetaMask):**\n` +
+              `• ✅ You paid gas fees directly\n` +
+              `• ✅ Transaction is immediately on-chain\n` +
+              `• ✅ Works with all DeFi protocols\n\n` +
+              `🎉 Recipient will receive ${amount} MNT once confirmed!`,
+            source: message.content?.source || "user",
+            data: {
+              transactionHash: finalOperation?.hash,
+              to,
+              amount,
+              from: wallet.address,
+              gasUsed: receipt?.gasUsed.toString(),
+              gasCost: activity.gasTokenAmount?.toRawAmount(),
+              explorerUrl: `https://sepolia.mantlescan.xyz/tx/${finalOperation?.hash}`,
+              type: "eoa_transaction",
+            },
+          };
+
+          if (callback) {
+            await callback(responseContent);
+          }
+        } else if (
+          [ActivityStatus.FAILED, ActivityStatus.NOT_FOUND].includes(
+            activity?.overallStatus
+          )
+        ) {
+          // TODO(Adeoba): handle this case
+        }
+      };
+
+      const sendResponse = await virtualNodeProvider.sendOperationSet(
+        accountCluster,
+        response,
+        signTransaction, // signTransaction
+        undefined, // signUserOperation
+        signTypedData // signTypedData
+      );
+
+      if (!sendResponse) {
+        throw new Error("failed to send operation set");
       }
 
+      // Subscribe to operation set status updates
+      const subscriptionKey =
+        virtualNodeProvider?.subscribeToOperationSetStatus(
+          sendResponse.operationSetId,
+          onOperationSetStatusUpdateCallback
+        );
+
+      // TODO(Adeoba): make sure this is what you want
       return createActionResult({
-        text: responseContent.text,
-        data: responseContent.data as Record<string, any>,
+        text: "Processing ...",
+        data: subscriptionKey as Record<string, any>,
         success: true,
       });
     } catch (error) {
@@ -313,11 +418,13 @@ export const checkEOABalanceAction: Action = {
         );
       }
 
-      // Get balance from blockchain
-      const provider = new ethers.JsonRpcProvider(
-        "https://rpc.sepolia.mantle.xyz"
+      const { virtualNodeProvider } = await service.orbySetup(
+        process.env.ORBY_PRIVATE_INSTANCE_URL!,
+        BigInt(5003),
+        address
       );
-      const balance = await provider.getBalance(address);
+
+      const balance = await virtualNodeProvider.getBalance(address);
       const balanceEth = ethers.formatEther(balance);
 
       const responseContent: Content = {
