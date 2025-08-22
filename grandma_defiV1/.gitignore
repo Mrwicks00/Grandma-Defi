@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.env
+.eliza/
+*.log
+.DS_Store
+*.pid
+*.seed
+*.pid.lock
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
